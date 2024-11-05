@@ -48,18 +48,12 @@ class TradingBot:
         if open_positions:
             current_position = open_positions[0]  # Assume only one open position at a time
             position_side = current_position['side']
+            position_size = float(current_position['size'])
 
             # Determine if the trend change requires closing the position
             if (trend == 'uptrend' and position_side == 'Sell') or (trend == 'downtrend' and position_side == 'Buy'):
                 logging.info(f"Trend changed to {trend}. Closing open position: {position_side}.")
-                close_side = 'Buy' if position_side == 'Sell' else 'Sell'
-                self.data_fetcher.place_order(
-                    symbol=self.symbol,
-                    side=close_side,
-                    qty=self.quantity,
-                    current_price=self.data_fetcher.get_real_time_price(self.symbol),
-                    leverage=10,
-                )
+                self.data_fetcher.close_position(symbol=self.symbol, size=position_size)
                 return True  # Position was closed due to trend change
             else:
                 logging.info(f"No trend change detected. Current position side: {position_side}, trend: {trend}.")
@@ -69,13 +63,14 @@ class TradingBot:
             return False  # No position to close because none was open
 
 
+
     def job(self):
         logging.info("-------------------- Bot Iteration --------------------")
 
-        # Fetch 15-minute data to determine trend and H1 data for MACD
+        # Fetch 15-minute data for trend and 1-hour data for RSI/Bollinger confirmation
         logging.info("Fetching 15-minute (M15) data for trend detection...")
         m15_data = self.data_fetcher.get_historical_data(self.symbol, '15', 100)
-        logging.info("Fetching 1-hour (H1) data for MACD confirmation...")
+        logging.info("Fetching 1-hour (H1) data for RSI/Bollinger confirmation...")
         h1_data = self.data_fetcher.get_historical_data(self.symbol, '60', 100)
 
         if not m15_data or not h1_data:
@@ -109,13 +104,13 @@ class TradingBot:
         if not self.check_last_position_time():
             return
 
-        # Confirm trade entry with MACD on H1
-        macd_signal = self.strategy.macd_confirmation(h1_df)
-        if trend and macd_signal:
+        # Confirm trade entry with RSI and Bollinger Bands on H1, aligned with trend
+        rsi_bollinger_signal = self.strategy.rsi_bollinger_confirmation(h1_df, trend)
+        if trend and rsi_bollinger_signal:
             stop_loss, take_profit = self.risk_management.calculate_risk_management(h1_df, trade_direction)
             side = 'Buy' if trade_direction == 'long' else 'Sell'
 
-            logging.info(f"MACD confirmation: {macd_signal} - Placing {side} order.")
+            logging.info(f"RSI and Bollinger confirmation: {rsi_bollinger_signal} - Placing {side} order.")
             order_result = self.data_fetcher.place_order(
                 symbol=self.symbol,
                 side=side,
@@ -132,9 +127,6 @@ class TradingBot:
                 logging.error("Failed to place order.")
         else:
             logging.info("No trade signal generated.")
-
-
-
 
     def run(self):
         self.job()  # Execute once immediately
