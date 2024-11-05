@@ -98,24 +98,24 @@ class BybitDemoSession:
                     print("Stop-loss is lower than or equal to the limit price for a Sell order. Adjusting stop-loss...")
                     # stop_loss = price * 1.005  # Ensure stop-loss is slightly above the limit price
 
-            order_params = {
-                "category": "linear",
-                "symbol": symbol,
-                "side": side,
-                "orderType": "Limit",
-                "qty": str(qty),  # Convert quantity to string
-                "price": str(price),  # Ensure price is sent as a string
-                "positionIdx": position_idx,  # Use the positionIdx determined above
-            }
-
             # order_params = {
             #     "category": "linear",
             #     "symbol": symbol,
             #     "side": side,
-            #     "orderType": "Market",  # Changed to Market order
+            #     "orderType": "Limit",
             #     "qty": str(qty),  # Convert quantity to string
+            #     "price": str(price),  # Ensure price is sent as a string
             #     "positionIdx": position_idx,  # Use the positionIdx determined above
             # }
+
+            order_params = {
+                "category": "linear",
+                "symbol": symbol,
+                "side": side,
+                "orderType": "Market",  # Changed to Market order
+                "qty": str(qty),  # Convert quantity to string
+                "positionIdx": position_idx,  # Use the positionIdx determined above
+            }
 
             if stop_loss:
                 order_params["stopLoss"] = str(stop_loss)
@@ -224,6 +224,7 @@ class BybitDemoSession:
             closed_positions = [pos for pos in positions if float(pos['size']) == 0]
 
             if closed_positions:
+                # Find the most recent closed position
                 last_closed_position = max(closed_positions, key=lambda x: int(x['updatedTime']))
                 return last_closed_position
             else:
@@ -245,4 +246,28 @@ class BybitDemoSession:
             return float(response['result']['list'][0]['lastPrice'])
         except Exception as e:
             print(f"Ошибка при получении текущей цены: {e}")
+            return None
+        
+    def close_position(self, symbol, size):
+        try:
+            # Assuming we are in hedge mode; if not, update as needed.
+            endpoint = "/v5/order/create"
+            side = "Sell" if size > 0 else "Buy"  # Reverse side to close position
+
+            params = {
+                "category": "linear",
+                "symbol": symbol,
+                "side": side,
+                "orderType": "Market",
+                "qty": str(abs(size)),
+                "positionIdx": 0  # Use 0 for one-way mode, 1 or 2 for hedge mode
+            }
+
+            response = self.send_request("POST", endpoint, params)
+            if response['retCode'] != 0:
+                raise Exception(f"API Error: {response['retMsg']}")
+            print(f"Position closed successfully: {response}")
+            return response
+        except Exception as e:
+            print(f"Error closing position: {e}")
             return None

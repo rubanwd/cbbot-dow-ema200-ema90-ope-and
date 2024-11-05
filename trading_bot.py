@@ -9,7 +9,9 @@ from dotenv import load_dotenv
 import os
 import pandas as pd
 from bybit_demo_session import BybitDemoSession
-from helpers import Helpers  # Import the Helpers module
+from helpers import Helpers
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class TradingBot:
     def __init__(self):
@@ -25,82 +27,118 @@ class TradingBot:
         self.risk_management = RiskManagement()
         self.symbol = os.getenv("TRADING_SYMBOL", 'BTCUSDT')
         self.quantity = float(os.getenv("TRADE_QUANTITY", 0.03))
-        self.interval = {'D1': 'D', 'H4': '240', 'H1': '60'}
+        self.last_closed_position_time = 0
+
+    def check_last_position_time(self):
+        last_closed_position = self.data_fetcher.get_last_closed_position(self.symbol)
+        if last_closed_position:
+            last_closed_time = int(last_closed_position['updatedTime']) / 1000
+            time_since_last_close = time.time() - last_closed_time
+            if time_since_last_close < 1800:  # 30 minutes = 1800 seconds
+                logging.info("Last closed position was less than 30 minutes ago. Skipping trade.")
+                return False
+        return True
+
+    def close_position_if_trend_changed(self, trend):
+        """
+        Closes the open position if the trend has changed.
+        Returns True if a position was closed, False otherwise.
+        """
+        open_positions = self.data_fetcher.get_open_positions(self.symbol)
+        if open_positions:
+            current_position = open_positions[0]  # Assume only one open position at a time
+            position_side = current_position['side']
+
+            # Determine if the trend change requires closing the position
+            if (trend == 'uptrend' and position_side == 'Sell') or (trend == 'downtrend' and position_side == 'Buy'):
+                logging.info(f"Trend changed to {trend}. Closing open position: {position_side}.")
+                close_side = 'Buy' if position_side == 'Sell' else 'Sell'
+                self.data_fetcher.place_order(
+                    symbol=self.symbol,
+                    side=close_side,
+                    qty=self.quantity,
+                    current_price=self.data_fetcher.get_real_time_price(self.symbol),
+                    leverage=10,
+                )
+                return True  # Position was closed due to trend change
+            else:
+                logging.info(f"No trend change detected. Current position side: {position_side}, trend: {trend}.")
+                return False  # No position closed because trend didn’t change as needed
+        else:
+            logging.info("No open positions to check for trend change.")
+            return False  # No position to close because none was open
+
 
     def job(self):
-        print("--------------------")
-        is_open_positions = self.data_fetcher.get_open_positions(self.symbol)
-        if is_open_positions:
-            print("Open positions exist. Skipping.")
-            return
-        
-        is_open_orders = self.data_fetcher.get_open_orders(self.symbol)
-        if is_open_orders:
-            print("There is an open limit order. A new order will not be placed.")
-            return
+        logging.info("-------------------- Bot Iteration --------------------")
 
-        # Fetch historical data for all required timeframes
-        try:
-            print("Fetching Daily (D1) data...")
-            d1_data = self.data_fetcher.get_historical_data(self.symbol, self.interval['D1'], 100)
-            # print(f"Daily (D1) data: {d1_data}")
-            
-            print("Fetching 4-hour (H4) data...")
-            h4_data = self.data_fetcher.get_historical_data(self.symbol, self.interval['H4'], 100)
-            # print(f"4-hour (H4) data: {h4_data}")
-            
-            print("Fetching 1-hour (H1) data...")
-            h1_data = self.data_fetcher.get_historical_data(self.symbol, self.interval['H1'], 100)
-            # print(f"1-hour (H1) data: {h1_data}")
-        
-        except Exception as e:
-            print(f"Error fetching data: {e}")
-            return
-        
-        if not d1_data or len(d1_data) == 0:
-            print("D1 data is empty.")
-        if not h4_data or len(h4_data) == 0:
-            print("H4 data is empty.")
-        if not h1_data or len(h1_data) == 0:
-            print("H1 data is empty.")
+        # Fetch 15-minute data to determine trend and H1 data for MACD
+        logging.info("Fetching 15-minute (M15) data for trend detection...")
+        m15_data = self.data_fetcher.get_historical_data(self.symbol, '15', 100)
+        logging.info("Fetching 1-hour (H1) data for MACD confirmation...")
+        h1_data = self.data_fetcher.get_historical_data(self.symbol, '60', 100)
 
-        if not d1_data or not h4_data or not h1_data:
-            print("Failed to fetch data for one of the timeframes.")
+        if not m15_data or not h1_data:
+            logging.warning("Failed to fetch data for required timeframes.")
             return
 
         # Prepare dataframes
-        d1_df = self.strategy.prepare_dataframe(d1_data)
-        h4_df = self.strategy.prepare_dataframe(h4_data)
+        m15_df = self.strategy.prepare_dataframe(m15_data)
         h1_df = self.strategy.prepare_dataframe(h1_data)
 
-        # Apply strategy based on Dow Theory
-        trend = self.strategy.multi_timeframe_dow_strategy(d1_df, h4_df, h1_df)
-        if trend:
-            stop_loss, take_profit = self.risk_management.calculate_risk_management(h1_df, trend)
-            side = 'Buy' if trend == 'long' else 'Sell'
+        # Determine trend based on EMA-200 and EMA-90 on M15
+        trend = self.strategy.ema_trend_strategy(m15_df)
+        logging.info(f"15-min Trend: {trend}")
 
+        # Map trend to 'long'/'short' for risk management compatibility
+        trade_direction = 'long' if trend == 'uptrend' else 'short'
+
+        # Check for open positions and close if trend has changed
+        open_positions = self.data_fetcher.get_open_positions(self.symbol)
+        if open_positions:
+            logging.info("An open position exists. Checking for trend change.")
+            position_closed = self.close_position_if_trend_changed(trend)
+            if position_closed:
+                logging.info("Position closed due to trend change. Skipping new trade entry.")
+                return  # Exit after closing the position
+            else:
+                logging.info("Trend has not changed enough to close the position.")
+                return  # Skip trade entry since a position is still open
+
+        # Check if sufficient time has passed since the last closed position
+        if not self.check_last_position_time():
+            return
+
+        # Confirm trade entry with MACD on H1
+        macd_signal = self.strategy.macd_confirmation(h1_df)
+        if trend and macd_signal:
+            stop_loss, take_profit = self.risk_management.calculate_risk_management(h1_df, trade_direction)
+            side = 'Buy' if trade_direction == 'long' else 'Sell'
+
+            logging.info(f"MACD confirmation: {macd_signal} - Placing {side} order.")
             order_result = self.data_fetcher.place_order(
                 symbol=self.symbol,
                 side=side,
                 qty=self.quantity,
                 current_price=h1_df['close'].iloc[-1],
-                leverage=10,  # Set leverage dynamically if needed
+                leverage=10,
                 # stop_loss=stop_loss,
                 take_profit=take_profit
             )
 
             if order_result:
-                print(f"Order successfully placed: {order_result}")
+                logging.info(f"Order successfully placed: {order_result}")
             else:
-                print("Failed to place order.")
+                logging.error("Failed to place order.")
         else:
-            print("No trade signal generated.")
+            logging.info("No trade signal generated.")
+
+
+
 
     def run(self):
         self.job()  # Execute once immediately
-        
-        # Check every 1 minute (customize as needed)
-        schedule.every(1).minutes.do(self.job)
+        schedule.every(1).minutes.do(self.job)  # Run every minute
 
         while True:
             schedule.run_pending()
