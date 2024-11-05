@@ -130,7 +130,7 @@ class TradingBot:
 
     def run(self):
         self.job()  # Execute once immediately
-        schedule.every(1).minutes.do(self.job)  # Run every minute
+        schedule.every(10).seconds.do(self.job)  # Run every minute
 
         while True:
             schedule.run_pending()
