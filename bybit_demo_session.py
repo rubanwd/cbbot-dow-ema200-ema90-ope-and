@@ -98,6 +98,16 @@ class BybitDemoSession:
                     print("Stop-loss is lower than or equal to the limit price for a Sell order. Adjusting stop-loss...")
                     # stop_loss = price * 1.005  # Ensure stop-loss is slightly above the limit price
 
+            # order_params = {
+            #     "category": "linear",
+            #     "symbol": symbol,
+            #     "side": side,
+            #     "orderType": "Limit",
+            #     "qty": str(qty),  # Convert quantity to string
+            #     "price": str(price),  # Ensure price is sent as a string
+            #     "positionIdx": position_idx,  # Use the positionIdx determined above
+            # }
+
             order_params = {
                 "category": "linear",
                 "symbol": symbol,
@@ -239,24 +249,18 @@ class BybitDemoSession:
             return None
         
     def close_position(self, symbol, size):
-        """
-        Closes an open position using a market order.
-        If using hedge mode, this function assumes size > 0 for long, size < 0 for short.
-        """
         try:
+            # Assuming we are in hedge mode; if not, update as needed.
             endpoint = "/v5/order/create"
-            # Determine the side to close: reverse side based on the size
-            side = "Sell" if size > 0 else "Buy"
-            # Ensure positionIdx matches your mode (hedge or one-way)
-            position_idx = 1 if side == "Buy" else 2  # Hedge mode assumption
+            side = "Sell" if size > 0 else "Buy"  # Reverse side to close position
 
             params = {
                 "category": "linear",
                 "symbol": symbol,
                 "side": side,
                 "orderType": "Market",
-                "qty": str(abs(size)),  # Use absolute size
-                "positionIdx": position_idx  # Adjust for mode if needed
+                "qty": str(abs(size)),
+                "positionIdx": 0  # Use 0 for one-way mode, 1 or 2 for hedge mode
             }
 
             response = self.send_request("POST", endpoint, params)
