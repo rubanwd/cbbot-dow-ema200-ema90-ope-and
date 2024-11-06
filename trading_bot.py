@@ -34,8 +34,8 @@ class TradingBot:
         if last_closed_position:
             last_closed_time = int(last_closed_position['updatedTime']) / 1000
             time_since_last_close = time.time() - last_closed_time
-            if time_since_last_close < 1800:  # 30 minutes = 1800 seconds
-                logging.info("Last closed position was less than 30 minutes ago. Skipping trade.")
+            if time_since_last_close < 120:  # 3 minutes = 120 seconds
+                logging.info("Last closed position was less than 3 minutes ago. Skipping trade.")
                 return False
         return True
 
@@ -72,10 +72,10 @@ class TradingBot:
     def job(self):
         logging.info("-------------------- Bot Iteration --------------------")
 
-        # Fetch 15-minute data to determine trend and H1 data for MACD
+        # Fetch 15-minute data to determine trend and H1 data for confirmation
         logging.info("Fetching 15-minute (M15) data for trend detection...")
         m15_data = self.data_fetcher.get_historical_data(self.symbol, '15', 100)
-        logging.info("Fetching 1-hour (H1) data for MACD confirmation...")
+        logging.info("Fetching 1-hour (H1) data for confirmation...")
         h1_data = self.data_fetcher.get_historical_data(self.symbol, '60', 100)
 
         if not m15_data or not h1_data:
@@ -109,20 +109,19 @@ class TradingBot:
         if not self.check_last_position_time():
             return
 
-        # Confirm trade entry with MACD on H1
-        macd_signal = self.strategy.macd_confirmation(h1_df)
-        if trend and macd_signal:
+        # Confirm trade entry using RSI or Bollinger Bands
+        confirmation_signal = self.strategy.rsi_bollinger_confirmation(h1_df, trend)
+        if confirmation_signal:
             stop_loss, take_profit = self.risk_management.calculate_risk_management(h1_df, trade_direction)
-            side = 'Buy' if trade_direction == 'long' else 'Sell'
+            side = 'Buy' if confirmation_signal == 'buy' else 'Sell'
 
-            logging.info(f"MACD confirmation: {macd_signal} - Placing {side} order.")
+            logging.info(f"Signal confirmed: {confirmation_signal} - Placing {side} order.")
             order_result = self.data_fetcher.place_order(
                 symbol=self.symbol,
                 side=side,
                 qty=self.quantity,
                 current_price=h1_df['close'].iloc[-1],
                 leverage=10,
-                # stop_loss=stop_loss,
                 take_profit=take_profit
             )
 
@@ -132,8 +131,6 @@ class TradingBot:
                 logging.error("Failed to place order.")
         else:
             logging.info("No trade signal generated.")
-
-
 
 
     def run(self):
