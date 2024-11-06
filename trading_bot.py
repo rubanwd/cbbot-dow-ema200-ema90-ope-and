@@ -110,7 +110,7 @@ class TradingBot:
             return
 
         # Confirm trade entry using RSI or Bollinger Bands
-        confirmation_signal = self.strategy.rsi_bollinger_confirmation(h1_df, trend)
+        confirmation_signal = self.strategy.rsi_bollinger_macd_confirmation(h1_df, trend)
         if confirmation_signal:
             stop_loss, take_profit = self.risk_management.calculate_risk_management(h1_df, trade_direction)
             side = 'Buy' if confirmation_signal == 'buy' else 'Sell'
@@ -135,7 +135,7 @@ class TradingBot:
 
     def run(self):
         self.job()  # Execute once immediately
-        schedule.every(2).minutes.do(self.job)  # Run every minute
+        schedule.every(10).seconds.do(self.job)
 
         while True:
             schedule.run_pending()
