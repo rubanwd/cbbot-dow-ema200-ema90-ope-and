@@ -22,7 +22,7 @@ class TradingBot:
             raise ValueError("API keys not found. Please set BYBIT_API_KEY and BYBIT_API_SECRET in your .env file.")
         
         self.data_fetcher = BybitDemoSession(self.api_key, self.api_secret)
-        self.strategy = Strategies()
+        self.strategy = Strategies(self.data_fetcher)
         self.indicators = Indicators()
         self.risk_management = RiskManagement()
         self.symbol = os.getenv("TRADING_SYMBOL", 'BTCUSDT')
@@ -84,7 +84,11 @@ class TradingBot:
 
         # Prepare dataframes
         m15_df = self.strategy.prepare_dataframe(m15_data)
-        h1_df = self.strategy.prepare_dataframe(h1_data)
+        # h1_df = self.strategy.prepare_dataframe(h1_data)
+
+        # Fetch current price
+        current_price = self.data_fetcher.get_real_time_price(self.symbol)
+        logging.info(f"Real-time price for {self.symbol}: {current_price}")
 
         # Determine trend based on EMA-200 and EMA-90 on M15
         trend = self.strategy.ema_trend_strategy(m15_df)
@@ -92,6 +96,10 @@ class TradingBot:
 
         # Map trend to 'long'/'short' for risk management compatibility
         trade_direction = 'long' if trend == 'uptrend' else 'short'
+
+        m15_df['rsi'] = self.indicators.calculate_rsi(m15_df, 14)
+        rsi = m15_df['rsi'].iloc[-1]
+        logging.info(f"RSI: {rsi}")
 
         # Check for open positions and close if trend has changed
         open_positions = self.data_fetcher.get_open_positions(self.symbol)
@@ -109,10 +117,10 @@ class TradingBot:
         if not self.check_last_position_time():
             return
 
-        # Confirm trade entry using RSI or Bollinger Bands
-        confirmation_signal = self.strategy.rsi_bollinger_macd_confirmation(h1_df, trend)
+        # Confirm trade entry using RSI or Bollinger Bands, passing the current price
+        confirmation_signal = self.strategy.rsi_bollinger_macd_confirmation(m15_df, trend, current_price)
         if confirmation_signal:
-            stop_loss, take_profit = self.risk_management.calculate_risk_management(h1_df, trade_direction)
+            stop_loss, take_profit = self.risk_management.calculate_risk_management(m15_df, trade_direction)
             side = 'Buy' if confirmation_signal == 'buy' else 'Sell'
 
             logging.info(f"Signal confirmed: {confirmation_signal} - Placing {side} order.")
@@ -120,7 +128,7 @@ class TradingBot:
                 symbol=self.symbol,
                 side=side,
                 qty=self.quantity,
-                current_price=h1_df['close'].iloc[-1],
+                current_price=current_price,
                 leverage=10,
                 take_profit=take_profit
             )
@@ -131,7 +139,6 @@ class TradingBot:
                 logging.error("Failed to place order.")
         else:
             logging.info("No trade signal generated.")
-
 
     def run(self):
         self.job()  # Execute once immediately

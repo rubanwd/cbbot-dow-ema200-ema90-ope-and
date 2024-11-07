@@ -56,14 +56,14 @@ class Strategies:
 
         # Confirmations using current price
         if trend == 'uptrend':
-            if rsi < 40 or current_price < lower_band:
+            if rsi < 30 or current_price < lower_band:
                 logging.info("RSI/Bollinger confirmation: Buy signal.")
                 return 'buy'
             if prev_macd_line < prev_macd_signal_line and macd_line > macd_signal_line:
                 logging.info("MACD confirmation: Buy signal.")
                 return 'buy'
         elif trend == 'downtrend':
-            if rsi > 60 or current_price > upper_band:
+            if rsi > 70 or current_price > upper_band:
                 logging.info("RSI/Bollinger confirmation: Sell signal.")
                 return 'sell'
             if prev_macd_line > prev_macd_signal_line and macd_line < macd_signal_line:
