@@ -3,8 +3,9 @@ from indicators import Indicators
 import logging
 
 class Strategies:
-    def __init__(self):
+    def __init__(self, data_fetcher):
         self.indicators = Indicators()
+        self.data_fetcher = data_fetcher  # Dependency to fetch real-time price
 
     def prepare_dataframe(self, historical_data):
         """
@@ -30,11 +31,11 @@ class Strategies:
         logging.info(f"EMA-200: {ema_200}, EMA-90: {ema_90}")
         return 'uptrend' if ema_90 > ema_200 else 'downtrend'
 
-    def rsi_bollinger_macd_confirmation(self, df, trend):
+    def rsi_bollinger_macd_confirmation(self, df, trend, current_price):
         """
         Confirms trade signals using RSI, Bollinger Bands, and MACD cross.
-        - For uptrend: RSI < 40, close < lower Bollinger Band, or MACD line crosses above signal line (buy signal).
-        - For downtrend: RSI > 60, close > upper Bollinger Band, or MACD line crosses below signal line (sell signal).
+        - For uptrend: RSI < 40, current price < lower Bollinger Band, or MACD line crosses above signal line (buy signal).
+        - For downtrend: RSI > 60, current price > upper Bollinger Band, or MACD line crosses below signal line (sell signal).
         """
         # Calculate indicators
         df['rsi'] = self.indicators.calculate_rsi(df, 14)
@@ -42,7 +43,6 @@ class Strategies:
         macd, macd_signal = self.indicators.calculate_macd(df)
 
         # Latest values
-        latest_close = df['close'].iloc[-1]
         rsi = df['rsi'].iloc[-1]
         lower_band = df['bollinger_lower'].iloc[-1]
         upper_band = df['bollinger_upper'].iloc[-1]
@@ -51,19 +51,19 @@ class Strategies:
         prev_macd_line = macd.iloc[-2]
         prev_macd_signal_line = macd_signal.iloc[-2]
 
-        logging.info(f"RSI: {rsi}, Close: {latest_close}, Bollinger Bands: [{lower_band}, {upper_band}]")
+        logging.info(f"RSI: {rsi}, Current Price: {current_price}, Bollinger Bands: [{lower_band}, {upper_band}]")
         logging.info(f"MACD: {macd_line}, Signal: {macd_signal_line}, Previous MACD: {prev_macd_line}, Previous Signal: {prev_macd_signal_line}")
 
-        # Confirmations
+        # Confirmations using current price
         if trend == 'uptrend':
-            if rsi < 40 or latest_close < lower_band:
+            if rsi < 40 or current_price < lower_band:
                 logging.info("RSI/Bollinger confirmation: Buy signal.")
                 return 'buy'
             if prev_macd_line < prev_macd_signal_line and macd_line > macd_signal_line:
                 logging.info("MACD confirmation: Buy signal.")
                 return 'buy'
         elif trend == 'downtrend':
-            if rsi > 60 or latest_close > upper_band:
+            if rsi > 60 or current_price > upper_band:
                 logging.info("RSI/Bollinger confirmation: Sell signal.")
                 return 'sell'
             if prev_macd_line > prev_macd_signal_line and macd_line < macd_signal_line:
@@ -72,3 +72,4 @@ class Strategies:
 
         logging.info("No confirmation signal generated.")
         return None
+
