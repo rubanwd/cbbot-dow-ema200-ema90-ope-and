@@ -55,21 +55,11 @@ class Strategies:
         logging.info(f"MACD: {macd_line}, Signal: {macd_signal_line}, Previous MACD: {prev_macd_line}, Previous Signal: {prev_macd_signal_line}")
 
         # Confirmations using current price
-        if trend == 'uptrend':
-            if rsi < 30 or current_price < lower_band:
-                logging.info("RSI/Bollinger confirmation: Buy signal.")
-                return 'buy'
-            if prev_macd_line < prev_macd_signal_line and macd_line > macd_signal_line:
-                logging.info("MACD confirmation: Buy signal.")
-                return 'buy'
-        elif trend == 'downtrend':
-            if rsi > 70 or current_price > upper_band:
-                logging.info("RSI/Bollinger confirmation: Sell signal.")
-                return 'sell'
-            if prev_macd_line > prev_macd_signal_line and macd_line < macd_signal_line:
-                logging.info("MACD confirmation: Sell signal.")
-                return 'sell'
-
-        logging.info("No confirmation signal generated.")
+        if trend == 'uptrend' and (rsi < 30 or current_price < lower_band or
+                                   (prev_macd_line < prev_macd_signal_line and macd_line > macd_signal_line)):
+            return 'buy'
+        elif trend == 'downtrend' and (rsi > 70 or current_price > upper_band or
+                                       (prev_macd_line > prev_macd_signal_line and macd_line < macd_signal_line)):
+            return 'sell'
         return None
 
