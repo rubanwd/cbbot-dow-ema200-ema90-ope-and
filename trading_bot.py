@@ -74,11 +74,11 @@ class TradingBot:
 
         # Fetch 15-minute data to determine trend and H1 data for confirmation
         logging.info("Fetching 15-minute (M15) data for trend detection...")
-        m15_data = self.data_fetcher.get_historical_data(self.symbol, '15', 100)
+        m15_data = self.data_fetcher.get_historical_data(self.symbol, '15', 200)
         logging.info("Fetching 1-hour (H1) data for confirmation...")
-        h1_data = self.data_fetcher.get_historical_data(self.symbol, '60', 100)
+        # h1_data = self.data_fetcher.get_historical_data(self.symbol, '60', 800)
 
-        if not m15_data or not h1_data:
+        if not m15_data:
             logging.warning("Failed to fetch data for required timeframes.")
             return
 
