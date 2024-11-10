@@ -91,7 +91,7 @@ class TradingBot:
         logging.info(f"Real-time price for {self.symbol}: {current_price}")
 
         # Determine trend based on EMA-200 and EMA-90 on M15
-        trend = self.strategy.ema_trend_strategy(m15_df)
+        trend = self.strategy.sma_trend_strategy(m15_df)
         logging.info(f"15-min Trend: {trend}")
 
         # Map trend to 'long'/'short' for risk management compatibility

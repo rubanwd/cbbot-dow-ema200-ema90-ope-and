@@ -30,6 +30,20 @@ class Strategies:
 
         logging.info(f"EMA-200: {ema_200}, EMA-90: {ema_90}")
         return 'uptrend' if ema_90 > ema_200 else 'downtrend'
+    
+    def sma_trend_strategy(self, df):
+        """
+        Determines the trend based on SMA-200 and SMA-90.
+        Returns 'uptrend' if SMA-90 > SMA-200, otherwise 'downtrend'.
+        """
+        df['sma_200'] = self.indicators.calculate_sma(df, 200)
+        df['sma_90'] = self.indicators.calculate_sma(df, 90)
+
+        sma_200 = df['sma_200'].iloc[-1]
+        sma_90 = df['sma_90'].iloc[-1]
+
+        logging.info(f"SMA-200: {sma_200}, SMA-90: {sma_90}")
+        return 'uptrend' if sma_90 > sma_200 else 'downtrend'
 
     def rsi_bollinger_macd_confirmation(self, df, trend, current_price):
         """
@@ -63,10 +77,10 @@ class Strategies:
         #     return 'sell'
         # return None
     
-        if trend == 'uptrend' and (rsi < 30 or current_price < lower_band):
+        if trend == 'uptrend' and (rsi < 35 or current_price < lower_band):
             return 'buy'
         
-        if trend == 'downtrend' and (rsi > 70 or current_price > upper_band):
+        if trend == 'downtrend' and (rsi > 65 or current_price > upper_band):
             return 'sell'
         
         return None

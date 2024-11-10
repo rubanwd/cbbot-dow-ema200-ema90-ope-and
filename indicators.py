@@ -2,6 +2,13 @@ class Indicators:
     @staticmethod
     def calculate_ema(df, span):
         return df['close'].ewm(span=span, adjust=False).mean()
+    
+    @staticmethod
+    def calculate_sma(df, window):
+        """
+        Calculates the Simple Moving Average (SMA).
+        """
+        return df['close'].rolling(window=window).mean()
 
     @staticmethod
     def calculate_rsi(df, period=14):
