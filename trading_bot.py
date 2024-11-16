@@ -74,7 +74,7 @@ class TradingBot:
 
         # Fetch 15-minute data to determine trend and H1 data for confirmation
         logging.info("Fetching 15-minute (M15) data for trend detection...")
-        m15_data = self.data_fetcher.get_historical_data(self.symbol, '15', 200)
+        m15_data = self.data_fetcher.get_historical_data(self.symbol, '15', 400)
         logging.info("Fetching 1-hour (H1) data for confirmation...")
         # h1_data = self.data_fetcher.get_historical_data(self.symbol, '60', 800)
 
@@ -90,12 +90,15 @@ class TradingBot:
         current_price = self.data_fetcher.get_real_time_price(self.symbol)
         logging.info(f"Real-time price for {self.symbol}: {current_price}")
 
-        # Determine trend based on EMA-200 and EMA-90 on M15
-        trend = self.strategy.sma_trend_strategy(m15_df)
-        logging.info(f"15-min Trend: {trend}")
+        # Determine trend based on SMA-200 and SMA-90 on M15
+        trendSMA = self.strategy.sma_trend_strategy(m15_df)
+        logging.info(f"15-min Trend SMA: {trendSMA}")
+
+        trendEMA = self.strategy.ema_trend_strategy(m15_df)
+        logging.info(f"15-min Trend EMA: {trendEMA}")
 
         # Map trend to 'long'/'short' for risk management compatibility
-        trade_direction = 'long' if trend == 'uptrend' else 'short'
+        trade_direction = 'long' if trendEMA == 'uptrend' else 'short'
 
         m15_df['rsi'] = self.indicators.calculate_rsi(m15_df, 14)
         rsi = m15_df['rsi'].iloc[-1]
@@ -105,7 +108,7 @@ class TradingBot:
         open_positions = self.data_fetcher.get_open_positions(self.symbol)
         if open_positions:
             logging.info("An open position exists. Checking for trend change.")
-            position_closed = self.close_position_if_trend_changed(trend)
+            position_closed = self.close_position_if_trend_changed(trendEMA)
             if position_closed:
                 logging.info("Position closed due to trend change. Skipping new trade entry.")
                 return  # Exit after closing the position
@@ -118,7 +121,7 @@ class TradingBot:
             return
 
         # Confirm trade entry using RSI or Bollinger Bands, passing the current price
-        confirmation_signal = self.strategy.rsi_bollinger_macd_confirmation(m15_df, trend, current_price)
+        confirmation_signal = self.strategy.rsi_bollinger_macd_confirmation(m15_df, trendEMA, current_price)
         if confirmation_signal:
             stop_loss, take_profit = self.risk_management.calculate_risk_management(m15_df, trade_direction)
             side = 'Buy' if confirmation_signal == 'buy' else 'Sell'
