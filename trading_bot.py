@@ -39,34 +39,34 @@ class TradingBot:
                 return False
         return True
 
-    def close_position_if_trend_changed(self, trend):
-        """
-        Closes the open position if the trend has changed.
-        Returns True if a position was closed, False otherwise.
-        """
-        open_positions = self.data_fetcher.get_open_positions(self.symbol)
-        if open_positions:
-            current_position = open_positions[0]  # Assume only one open position at a time
-            position_side = current_position['side']
+    # def close_position_if_trend_changed(self, trend):
+    #     """
+    #     Closes the open position if the trend has changed.
+    #     Returns True if a position was closed, False otherwise.
+    #     """
+    #     open_positions = self.data_fetcher.get_open_positions(self.symbol)
+    #     if open_positions:
+    #         current_position = open_positions[0]  # Assume only one open position at a time
+    #         position_side = current_position['side']
 
-            # Determine if the trend change requires closing the position
-            if (trend == 'uptrend' and position_side == 'Sell') or (trend == 'downtrend' and position_side == 'Buy'):
-                logging.info(f"Trend changed to {trend}. Closing open position: {position_side}.")
-                close_side = 'Buy' if position_side == 'Sell' else 'Sell'
-                self.data_fetcher.place_order(
-                    symbol=self.symbol,
-                    side=close_side,
-                    qty=self.quantity,
-                    current_price=self.data_fetcher.get_real_time_price(self.symbol),
-                    leverage=10,
-                )
-                return True  # Position was closed due to trend change
-            else:
-                logging.info(f"No trend change detected. Current position side: {position_side}, trend: {trend}.")
-                return False  # No position closed because trend didn’t change as needed
-        else:
-            logging.info("No open positions to check for trend change.")
-            return False  # No position to close because none was open
+    #         # Determine if the trend change requires closing the position
+    #         if (trend == 'uptrend' and position_side == 'Sell') or (trend == 'downtrend' and position_side == 'Buy'):
+    #             logging.info(f"Trend changed to {trend}. Closing open position: {position_side}.")
+    #             close_side = 'Buy' if position_side == 'Sell' else 'Sell'
+    #             self.data_fetcher.place_order(
+    #                 symbol=self.symbol,
+    #                 side=close_side,
+    #                 qty=self.quantity,
+    #                 current_price=self.data_fetcher.get_real_time_price(self.symbol),
+    #                 leverage=10,
+    #             )
+    #             return True  # Position was closed due to trend change
+    #         else:
+    #             logging.info(f"No trend change detected. Current position side: {position_side}, trend: {trend}.")
+    #             return False  # No position closed because trend didn’t change as needed
+    #     else:
+    #         logging.info("No open positions to check for trend change.")
+    #         return False  # No position to close because none was open
 
 
     def job(self):
@@ -107,14 +107,8 @@ class TradingBot:
         # Check for open positions and close if trend has changed
         open_positions = self.data_fetcher.get_open_positions(self.symbol)
         if open_positions:
-            logging.info("An open position exists. Checking for trend change.")
-            position_closed = self.close_position_if_trend_changed(trendEMA)
-            if position_closed:
-                logging.info("Position closed due to trend change. Skipping new trade entry.")
-                return  # Exit after closing the position
-            else:
-                logging.info("Trend has not changed enough to close the position.")
-                return  # Skip trade entry since a position is still open
+            logging.info("An open position exists.")
+            return  # Skip trade entry since a position is still open
 
         # Check if sufficient time has passed since the last closed position
         if not self.check_last_position_time():
