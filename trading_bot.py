@@ -35,7 +35,7 @@ class TradingBot:
             last_closed_time = int(last_closed_position['updatedTime']) / 1000
             time_since_last_close = time.time() - last_closed_time
             if time_since_last_close < 18000:  # 5 hours = 18000 seconds
-                logging.info("Last closed position was less than 3 minutes ago. Skipping trade.")
+                logging.info("Last closed position was less than 5 hours ago. Skipping trade.")
                 return False
         return True
 
